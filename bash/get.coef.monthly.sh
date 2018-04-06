@@ -81,12 +81,13 @@ do
 
 echo ... calculating coefficients for month $month ...
 
-gdl <<GDLEOF
+# PFU using idl instead of GDL
+# Also don't run curvefit.pro script as it is already included in idl library
+idl <<GDLEOF
 ipathBCmask = '$ipathBCmask'
 .r $sdir/gdl/readBCmask.pro
 .r $sdir/gdl/isleap.pro
 .r $sdir/gdl/transferfunction.pro
-.r $sdir/gdl/curvefit.pro
 .r $sdir/gdl/$gdlprocedure.pro
 $gdlprocedure,$gdlarguments
 exit

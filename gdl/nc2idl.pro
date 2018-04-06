@@ -10,6 +10,9 @@ pro nc2idl,ipath,opath,varname,NUMLANDPOINTS,land
   NCDF_CLOSE,id
   print,'converting '+ipath+' to '+opath
 
+  ; PFU fix for 4D variables: remove dimensions with size 1
+  ncdfdata = reform(ncdfdata,/OVERWRITE)
+
   ; l is the number of timesteps
   ; mind that NCDF_VARGET turns [time,lat,lon] NetCDF arrays into [lon,lat,time] IDL arrays
   l = n_elements(ncdfdata[0,0,*])

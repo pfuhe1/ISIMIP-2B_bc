@@ -12,6 +12,8 @@ print,'using '+ipathgcm+' and '+ipathobs+' to get transfer function coefficients
 ; read OBS data
 cmrestore,ipathobs
 tas_o=idldata
+print,'debug'
+print,size(idldata)
 
 
 ; read GCM data

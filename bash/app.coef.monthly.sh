@@ -87,7 +87,8 @@ do
 
 echo ... applying coefficients for month $month ...
 
-gdl <<GDLEOF
+# PFU using idl instead of gdl
+idl <<GDLEOF
 ipathBCmask = '$ipathBCmask'
 .r $sdir/gdl/readBCmask.pro
 .r $sdir/gdl/isleap.pro

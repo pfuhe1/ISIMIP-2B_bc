@@ -25,12 +25,11 @@ case $# in
   echo four or five input parameters expected !!! exiting ... $(date)
   exit;;
 esac  # #
-
 export obsdataset=$1
-case $obsdataset in
-EWEMBI|MSWEP|WFD)
+case $obsdataset in $allowed_obs )
   echo observational_dataset $obsdataset
-  export lmonsb=1;;
+#  export lmonsb=1;; # PFU mod 18/12/2017, to run without SLURM
+  export lmonsb=0;; 
 Forests*|Nottingham*)
   echo observational_dataset $obsdataset
   export lmonsb=0;;
@@ -83,11 +82,11 @@ fi
 if [ $lobs -eq 0 ]
 then
   export gcm=$5
-  case $gcm in
-  GFDL-ESM2M|HadGEM2-ES|IPSL-CM5A-LR|MIROC5)
+  case $gcm in $allowed_models )
     echo GCM $gcm;;
   *)
     echo GCM $gcm not supported !!! exiting ... $(date)
+	echo $allowed_models
     exit;;
   esac  # gcm
   idirgcm=$idirGCMdata/$gcm

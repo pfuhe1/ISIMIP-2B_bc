@@ -12,7 +12,7 @@
 
 source exports.settings.functions.sh
 
-
+remap=0
 
 # check input parameters
 if [ ! $# -eq 5 ]
@@ -22,8 +22,7 @@ then
 fi
 
 obsdataset=$1
-case $obsdataset in
-EWEMBI|MSWEP|WFD)
+case $obsdataset in $allowed_obs )
   echo observational dataset $obsdataset;;
 *)
   echo observational dataset $obsdataset not supported !!! exiting ... $(date)
@@ -52,13 +51,16 @@ esac
 
 gcm=$3
 case $gcm in  # set input calendar
-GFDL-ESM2M|IPSL-CM5A-LR|MIROC5|NorESM1-M)
+# GFDL-ESM2M|IPSL-CM5A-LR|MIROC5|NorESM1-M)
+  CAM4-2degree|CanAM4|MIROC5|NorESM1-HAPPI|CESM-CAM5)
   echo GCM $gcm
   icalendar=365_day;;
-CMCC-CESM)
+# CMCC-CESM)
+ ECHAM6-3-LR)
   echo GCM $gcm
   icalendar=standard;;
-HadGEM2-ES)
+# HadGEM2-ES)
+ HadAM3P|HadAM3P-EU25)
   echo GCM $gcm
   icalendar=360_day;;
 *)
@@ -68,7 +70,8 @@ esac  # gcm
 
 exp=$4
 case $exp in
-piControl|historical|rcp26|rcp45|rcp60|rcp85)
+# piControl|historical|rcp26|rcp45|rcp60|rcp85)
+ All-Hist|Plus15-Future|Plus20-Future)
   echo experiment $exp;;
 *)
   echo experiment $exp not supported !!! exiting ... $(date)
@@ -96,36 +99,56 @@ timeframe=${ysp}0101-${yep}1231
 
 # set input directory and file name
 # (customize to your raw climate model output data directory and file name structures)
-idir=$idirGCMsource/$exp/$frequency/$ivar/$gcm/$realization  
-ifile=${ivar}_${frequency}_${gcm}_${exp}_${realization}_$timeframe.nc
+#idir=$idirGCMsource/$exp/$frequency/$ivar/$gcm/$realization  
+#ifile=${ivar}_${frequency}_${gcm}_${exp}_${realization}_$timeframe.nc
+#est=est1
+#ver=v1-0
+# NOTE: require 'est' and 'ver' as environment variables
+domain=atmos
+idir=$idirGCMsource/$gcm/$exp/$est/$ver/$frequency/$domain/$ivar/$realization
+ifile=${ivar}_A${frequency}_${gcm}_${exp}_${est}_${ver}_${realization}_$timeframe.nc
 
 # set output directory and file name
 odir=$idirGCMdata/$gcm
 ofile=${ovar}_${frequency}_${gcm}_${exp}_${realization}_$timeframe  # suffix is determined by shell variable ncs
 [ ! -d $odir ] && mkdir -p $odir
 
-# set paths to remap weights
-remapweightsdir=$tdir/remapweights
-remapgriddesfile=$idirOBSdata/$obsdataset/$obsdataset.griddes
-remapweightsfile=$remapweightsdir/$gcm.remap$remapmethod.$obsdataset$remapweightsfileextension
-[ ! -d $remapweightsdir ] && mkdir -p $remapweightsdir
+# PFU hack to choose not to remap
+# Set remap=0 when observations and model use the same grid
+if [ $remap -ne 0 ]
+then
 
+	# set paths to remap weights
+	remapweightsdir=$tdir/remapweights
+	remapgriddesfile=$idirOBSdata/$obsdataset/$obsdataset.griddes
+	remapweightsfile=$remapweightsdir/$gcm.remap$remapmethod.$obsdataset$remapweightsfileextension
+	[ ! -d $remapweightsdir ] && mkdir -p $remapweightsdir
 
+	# DEBUG
+	echo infile $idir/$ifile
 
-# generate remap weights
-if [ $remapgriddesfile -nt $remapweightsfile.$ncs ]
-then 
-  echo generating remap weights ...
-  $cdo gen$remapmethod,$remapgriddesfile $idir/$ifile $remapweightsfile.$ncs
+	# generate remap weights
+	if [ $remapgriddesfile -nt $remapweightsfile.$ncs ]
+	then 
+	  echo generating remap weights ...
+	  $cdo gen$remapmethod,$remapgriddesfile $idir/$ifile $remapweightsfile.$ncs
+	fi
+	echo
+
+	# interpolate in space
+	echo interpolating $ysp-$yep in space ...
+	#$cdo -r setreftime,$tsp,day $cdosetname \
+	#     -remap,$remapgriddesfile,$remapweightsfile.$ncs $idir/$ifile \
+	#     $odir/$ofile.$ncs
+	# PFU hack to allow parallel processing (rename tmp.nc tmp_$realization.nc)
+	echo $odir/tmp_${ivar}_${gcm}_${exp}_${realization}.$ncs
+	$cdo remap,$remapgriddesfile,$remapweightsfile.$ncs $idir/$ifile $odir/tmp_${ivar}_${gcm}_${exp}_${realization}.$ncs
+	$cdo -r setreftime,$tsp,day $cdosetname $odir/tmp_${ivar}_${gcm}_${exp}_${realization}.$ncs $odir/$ofile.$ncs
+	rm $odir/tmp_${ivar}_${gcm}_${exp}_${realization}.$ncs
+	echo
+else
+	$cdo -r setreftime,$tsp,day $cdosetname $idir/$ifile $odir/$ofile.$ncs
 fi
-echo
-
-# interpolate in space
-echo interpolating $ysp-$yep in space ...
-$cdo -r setreftime,$tsp,day $cdosetname \
-     -remap,$remapgriddesfile,$remapweightsfile.$ncs $idir/$ifile \
-     $odir/$ofile.$ncs
-echo
 
 # interpolate in time
 case $icalendar in
@@ -165,6 +188,14 @@ case $icalendar in
        -setcalendar,$ocalendar \
        -settaxis,$tsp,1day $odir/$ofile.$ncs \
        $odir/$ofile.h.$ncs
+  # PFU add return value check as this command was often failing
+  rc=$?
+  if [ $rc -ne 0 ]; then
+	echo 'cdo command failed'
+	rm $odir/$ofile.$ncs
+	rm $odir/$ofile.h.$ncs
+	exit ${rc}
+  fi
   mv $odir/$ofile.h.$ncs $odir/$ofile.$ncs;;
 standard)
   if [[ $ysp -le 1582 ]]

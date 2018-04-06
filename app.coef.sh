@@ -26,10 +26,10 @@ then
 fi  # #
 
 export obsdataset=$1
-case $obsdataset in
-EWEMBI|MSWEP|WFD)
+case $obsdataset in $allowed_obs )
   echo observational_dataset $obsdataset
-  export lmonsb=0;;
+#  export lmonsb=1;; # PFU mod 18/12/2017, to run without SLURM
+  export lmonsb=0;; 
 Forests*|Nottingham*)
   echo observational_dataset $obsdataset
   export lmonsb=0;;
@@ -141,8 +141,7 @@ else
 fi
 
 export gcm=$5
-case $gcm in
-GFDL-ESM2M|HadGEM2-ES|IPSL-CM5A-LR|MIROC5)
+case $gcm in $allowed_models )
   echo GCM $gcm;;
 *)
   echo GCM $gcm not supported !!! exiting ... $(date)
@@ -160,7 +159,7 @@ else
   exit
 fi  # per
 case $exp in
-piControl|historical|rcp26|rcp45|rcp60|rcp85)  # make sure that period fits into experiment period
+piControl|historical|rcp26|rcp45|rcp60|rcp85|All-Hist|Plus15-Future|Plus20-Future)  # make sure that period fits into experiment period
   ep=$(get_experiment_period $exp $gcm)
   export yse=$(cut -d '-' -f 1 <<<$ep)
   export yee=$(cut -d '-' -f 2 <<<$ep)
@@ -549,7 +548,9 @@ ps)
   ipathdata=$tdirgcmi/${ifile}_
   ipathtasu=$tdirgcmi/tas${ifilepostvar}_
   ipathtasc=$tdirgcmo/tas${ofilepostvar}_
-  ipathcoef=$tdirgcmc/${var}_${frequency}_${gcm}_${expreference}_${realization}_${obsdataset}_${ysreference}0101-${yereference}1231_
+  # PFU hack to add reference realization different to realization being bias corrected
+  #ipathcoef=$tdirgcmc/${var}_${frequency}_${gcm}_${expreference}_${realization}_${obsdataset}_${ysreference}0101-${yereference}1231_
+  ipathcoef=$tdirgcmc/${var}_${frequency}_${gcm}_${expreference}_${refrealization}_${obsdataset}_${ysreference}0101-${yereference}1231_
   opathdata=$tdirgcmo/${ofile}_
   for month in $(seq -w 1 12)
   do
@@ -587,12 +588,14 @@ esac  # bcmethod
 
 # set NetCDF attributes
 echo setting NetCDF attributes ...
-if [[ $gcm = HadGEM2-ES ]] && ([[ $exp = piControl ]] || [[ $exp = historical ]] || [[ $exp = rcp26 ]])
-then
-  nctitleprefix="CMIP5 output of ${var}_${frequency}_${gcm}_${exp}_${realization} rerun by Kate Halladay on the MOHC Cray XC40"
-else
-  nctitleprefix="CMIP5 output of ${var}_${frequency}_${gcm}_${exp}_${realization}"
-fi
+# PFU MOD: 
+nctitleprefix="HAPPI project output of ${var}_${frequency}_${gcm}_${exp}_${realization}"
+#if [[ $gcm = HadGEM2-ES ]] && ([[ $exp = piControl ]] || [[ $exp = historical ]] || [[ $exp = rcp26 ]])
+#then
+#  nctitleprefix="CMIP5 output of ${var}_${frequency}_${gcm}_${exp}_${realization} rerun by Kate Halladay on the MOHC Cray XC40"
+#else
+#  nctitleprefix="CMIP5 output of ${var}_${frequency}_${gcm}_${exp}_${realization}"
+#fi
 ncatted -h \
 -a standard_name,$var,o,c,"$var_standard_name" \
 -a long_name,$var,o,c,"$var_long_name" \

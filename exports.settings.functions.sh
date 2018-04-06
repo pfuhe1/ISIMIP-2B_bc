@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# PFU: print date for start of script
+#
+date
+
+###
+### PFU hack to use idl rather than gdl, this is now done in bashrc
+### 
+#alias gdl='idl'
+# Add path for cmsvlib
+#export IDL_PATH=$IDL_PATH:/home/bridge/pu17449/src/idl/cmsvlib
 
 
 ###
@@ -7,25 +17,44 @@
 ###
 
 
+export wdir=/export/anthropocene/array-01/pu17449/isimip_bc # work directory
+export sdir=/home/bridge/pu17449/src/ISIMIP2b_bc/ # source code directory (this script has to be in that directory)
+export tdir=$wdir/isimip_processing  # temporary output directory
+export idirOBSdata=$wdir/obs  # directory for observational data
+export idirGCMsource=$wdir/happi_data_long  # directory containing uncorrected GCM data to be pre-processed with interpolation script
 
-export wdir=/p/projects/isimip/isimip/data/bc1p5deg  # work directory
-export sdir=$wdir/BCroutines  # source code directory (this script has to be in that directory)
-export tdir=$wdir/tmp  # temporary output directory
-export idirGCMdata=$wdir/GCMinput  # directory for uncorrected GCM data
-export idirOBSdata=$wdir/OBSinput  # directory for observational data
-export odirGCMdata=$wdir/GCMoutput  # directory for corrected GCM data
-export idirGCMsource=/p/projects/ipcc_pcmdi/ipcc_ar5_pcmdi/pcmdi_data  # directory containing uncorrected GCM data to be pre-processed with interpolation script
-
+# Comment out these ones, and supply with environment variables
+#export idirGCMdata=$wdir/happi_data_regrid  # directory for uncorrected GCM data
+#export odirGCMdata=$wdir/happi_data_corrected  # directory for corrected GCM data
 
 
 ###
 ### parameters
 ###
 
+# PFU modification, 
+# Take these parameters from environment variables, not set here
+# This allows them to be changed without modifying the script here
+# 
+# export realization=r1i1p1
+# export realization=run001
+
+# refrealization: 
+# realization used for calculation of bias correction coefficients
+# export refrealization=run126
+
+# est and ver:
+# specific to HAPPI, used to determine the correct file paths
+# export est=est1
+# export ver=v1-0
+
+# PFU addition to allow easy addition of new observations
+shopt -s extglob
+allowed_obs='@(EWEMBI|EWEMBI-N96|MSWEP|WFD|EWEMBI-UK25)'
+allowed_models='@(CAM4-2degree|CanAM4|MIROC5|NorESM1-HAPPI|CESM-CAM5|ECHAM6-3-LR|HadAM3P|HadAM3P-EU25)'
 
 
 export frequency=day
-export realization=r1i1p1
 export historicalextensionpathway=rcp85  # for bias correction
 export ysdecadeoffset=1  # decade start year offset from 0
 export remapmethod=con  # for GCMinput pre-processing (con is preferred over con2 because con2 may remap non-negative to negative values)
@@ -45,8 +74,10 @@ export rsdsmaxfitthreshold=50.  # W m-2
 export correctionfactormaxnonneg=10.
 export correctionfactormaxtasminmax=3.
 export missval=1e20
-export cdo="cdo -f nc4c -z zip"
-export ncs="nc4"
+# PFU hack to serialize IO in cdo
+#export cdo="cdo -f nc4c -z zip"
+export cdo="cdo -L -f nc4c -z zip"
+export ncs="nc"
 export CDO_FILE_SUFFIX=.$ncs
 export GDL_PATH=$GDL_PATH:$sdir/gdl
 
@@ -130,6 +161,10 @@ function get_experiment_period {
     local ye85=2099;;
   esac  # 2
   case $1 in
+  All-Hist)
+	local ys=1950; local ye=2017;;
+  Plus15-Future|Plus20-Future)
+	local ys=2090; local ye=2120;;
   piControl)
     local ys=1661; local ye=$ye26;;
   historical)
@@ -275,30 +310,35 @@ function get_merge_reference_decades_ipaths {
   # returns the paths to decadal NetCDF files that need to be merged in order
   # to get one NetCDF file that covers the whole reference period
 
-  local yeh=$(cut -d '-' -f 2 <<<$(get_experiment_period historical))
-  local yse=$(cut -d '-' -f 1 <<<$(get_experiment_period $historicalextensionpathway))
+#  local yeh=$(cut -d '-' -f 2 <<<$(get_experiment_period historical))
+#  local yeh=$(cut -d '-' -f 2 <<<$(get_experiment_period All-Hist))
+#  local yse=$(cut -d '-' -f 1 <<<$(get_experiment_period $historicalextensionpathway))
   local ysreference=$(cut -d '-' -f 1 <<<$2)
   local yereference=$(cut -d '-' -f 2 <<<$2)
-  local ysds=$(get_first_year_of_decade_containing $ysreference $ysdecadeoffset)
-  local ysde=$(get_first_year_of_decade_containing $yereference $ysdecadeoffset)
-  local ipaths=
-  local ysd
-  for ysd in $(seq $ysds 10 $ysde)
-  do
-    local yed=$(( $ysd + 9 ))
-    if [ $yed -le $yeh ]
-    then
-      ipaths="$ipaths ${1}historical_${realization}_${ysd}0101-${yed}1231.$ncs"
-    elif [ $ysd -ge $yse ]
-    then
-      ipaths="$ipaths $1${historicalextensionpathway}_${realization}_${ysd}0101-${yed}1231.$ncs"
-    elif [ $yereference -le $yeh ]
-    then
-      ipaths="$ipaths ${1}historical_${realization}_${ysd}0101-${yeh}1231.$ncs"
-    else
-      ipaths="$ipaths ${1}historical_${realization}_${ysd}0101-${yeh}1231.$ncs $1${historicalextensionpathway}_${realization}_${yse}0101-${yed}1231.$ncs"
-    fi
-  done  # ysd
+#  local ysds=$(get_first_year_of_decade_containing $ysreference $ysdecadeoffset)
+#  local ysde=$(get_first_year_of_decade_containing $yereference $ysdecadeoffset)
+#  local ipaths=
+#  local ysd
+#  for ysd in $(seq $ysds 10 $ysde)
+#  do
+#    local yed=$(( $ysd + 9 ))
+#    # PFU hack to restrict file names to valid periods
+#	ysd=$(($ysd>$ysreference?$ysd:$ysreference)) # Greater of ysd and ysreference
+#	yed=$(($yed<$yereference?$yed:$yereference)) # Lesser of yed and yereference
+#    if [ $yed -le $yeh ]
+#    then
+#      ipaths="$ipaths ${1}All-Hist_${realization}_${ysd}0101-${yed}1231.$ncs"
+#    elif [ $ysd -ge $yse ]
+#    then
+#      ipaths="$ipaths $1${historicalextensionpathway}_${realization}_${ysd}0101-${yed}1231.$ncs"
+#    elif [ $yereference -le $yeh ]
+#    then
+#      ipaths="$ipaths ${1}All-Hist_${realization}_${ysd}0101-${yeh}1231.$ncs"
+#    else
+#      ipaths="$ipaths ${1}historical_${realization}_${ysd}0101-${yeh}1231.$ncs $1${historicalextensionpathway}_${realization}_${yse}0101-${yed}1231.$ncs"
+#    fi
+#  done  # ysd
+  ipaths=${1}All-Hist_${realization}_${ysreference}0101-${yereference}1231.$ncs
   echo $ipaths
   return 0
 }
@@ -540,7 +580,8 @@ function get_reference_experiment {
   # depending on whether yereference exceeds yehistorical
 
   local yereference=$(cut -d '-' -f 2 <<<$1)
-  local yehistorical=$(get_experiment_period historical foo | cut -d '-' -f 2)
+#  local yehistorical=$(get_experiment_period historical foo | cut -d '-' -f 2)
+  local yehistorical=$(get_experiment_period All-Hist foo | cut -d '-' -f 2)
   [ $yereference -gt $yehistorical ] && echo historical-$historicalextensionpathway || echo historical
   return 0
 }
@@ -602,14 +643,19 @@ function merge_reference_decades_if_necessary {
 
   local ipaths=$(get_merge_reference_decades_ipaths $idirGCMdata/$2/${1}_${frequency}_${2}_ $3)
   exit_if_any_does_not_exist $ipaths
-  local lmerge=0; local ipath; for ipath in $ipaths; do [ $ipath -nt $4 ] && lmerge=1; done
-  if [ $lmerge -eq 1 ]
+  # PFU HACK
+#  local lmerge=0; local ipath; for ipath in $ipaths; do [ $ipath -nt $4 ] && lmerge=1; done
+#  if [ $lmerge -eq 1 ]
+  if [ "${#ipaths[@]}" -gt 1 ]
   then
     echo merging decadal NetCDF input files to $4 ...
     local cdopipe=$(get_merge_reference_decades_cdopipe $idirGCMdata/$2/${1}_${frequency}_${2}_ $3 $5)
     $cdo -O mergetime $cdopipe $4
     echo ... merging done
     echo
+  else
+	echo only one input file, copying: $ipaths $4
+    cp $ipaths $4
   fi
   return 0
 }
