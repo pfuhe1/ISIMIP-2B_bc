@@ -7,7 +7,7 @@
 # Assumes that the bias correction transfer coefficients for the model/variable
 # have already been calculated, and applies the bias correction to other runs
 
-import sys,os,glob,subprocess
+import sys,os,glob,subprocess,shutil
 import multiprocessing
 #import multiprocessing.dummy
 sys.path.append('/home/bridge/pu17449/src/happi_data_processing')
@@ -20,32 +20,49 @@ def list_to_string(l):
 		s += item +' '
 	return s
 
+########################################
+
 # Input parameters
-var='tas'
+var='pr'
 freq='day'
+# Multithreading
+numthreads=1
+
+######## Observational dataset ########
 obsname = 'EWEMBI'
 
-#model='NorESM1-HAPPI'
-#daterange_calibrate = '1979-2013'
-#realization_calibrate = 'run126'
+############### Model #################
+
+model='NorESM1-HAPPI'
+daterange_calibrate = '1979-2013'
+realization_calibrate = 'run126'
 
 #model='CAM4-2degree'
 #daterange_calibrate = '1979-2013'
 #realization_calibrate = 'ens1000'
 
-model = 'HadAM3P'
-daterange_calibrate = '1987-2013'
-realization_calibrate = 'runcat1'
+
+#model='MIROC5'
+#realization_calibrate = 'run101'
+#daterange_calibrate = '1979-2013'
+
+#model = 'HadAM3P'
+#daterange_calibrate = '1987-2013'
+#realization_calibrate = 'runcat1'
+
+#model='ECHAM6-3-LR'
+#realization_calibrate = 'run001' 
+#daterange_calibrate = '1979-2013'
+
+################ Experiment ################
 
 expt='All-Hist'
 daterange_app = '2006-2015'
 
-#expt='Plus20-Future'
-#daterange_app='2106-2115'
+#expt='Plus15-Future'
+#daterange_app='2106-2115' # FOR CAM4, MIROC, ECHAM
 #daterange_app = '2090-2099'
 
-# Multithreading
-numthreads=3
 
 ###############################################################################
 # Paths
@@ -64,7 +81,8 @@ odirGCMdata = os.path.join(wdir,'happi_data_corrected')
 os.environ['odirGCMdata']=odirGCMdata
 
 # Original location of the happi data
-datadir = os.path.join(wdir,'../happi_data_extra/')
+#datadir = os.path.join(wdir,'../happi_data_extra/')
+datadir = os.path.join(wdir,'../happi_data/')
 logdir = os.path.join(wdir,'logs/')
 
 # Not used in this script but needed for ISIMIP scripts:
@@ -168,7 +186,7 @@ def bias_correct_run(model,expt,var,freq,daterange_calibrate,daterange_app,idirG
 		print 'File already exists, skipping step 2:',regrid_file
 
 
-	##################################################################
+##########################################################################################
 	# 3) ISIMIP script: app.coef
 	flog = wdir+'/logs/bc_'+model+'_'+var+'_'+expt+'_'+realization+'.log'
 	cmd = sdir+'/app.coef.sh '+obsname+' '+daterange_calibrate+' '+var+' '+var+' '+model+' '+expt+' '+daterange_app
@@ -193,11 +211,18 @@ def bias_correct_run(model,expt,var,freq,daterange_calibrate,daterange_app,idirG
 		print 'Log file at:',flog
 
 
-###########################################################################################
+##########################################################################################
 # Main script
+
+idat_dir = os.path.join(tdir,model,obsname,'idat')
+odat_dir = os.path.join(tdir,model,obsname,'odat')
 
 # Call script by Pete to get paths of runs
 f_runs = get_runs(model,expt,datadir,freq,var)
+
+# First create idat_dir if necessary
+if not os.path.exists(idat_dir):
+	os.makedirs(idat_dir)
 
 # Create pool of processes to process runs in parallel. 
 #
@@ -212,6 +237,21 @@ for runpath in f_runs[:100]:
 
 # Finish up
 pool.close()
-pool.join()	
+pool.join()
 
+##########################################################################################
 
+# Finally do a bit of cleaning up
+
+if os.path.exists(idat_dir):
+	print('deleting idat dir',idat_dir)
+	shutil.rmtree(idat_dir)
+else:
+	print('trying to delete but idat dir doesnt exist',idat_dir)
+	
+
+if os.path.exists(odat_dir):
+	print('deleting odat dir',odat_dir)
+	shutil.rmtree(odat_dir)
+else:
+	print('trying to delete but odat dir doesnt exist',odat_dir)

@@ -12,7 +12,9 @@
 
 source exports.settings.functions.sh
 
-remap=0
+# Flag to determine whether we interpolate to the OBS grid or not
+# This must only be 0 if the grids of the model and OBS are identical
+remap=1
 
 # check input parameters
 if [ ! $# -eq 5 ]

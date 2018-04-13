@@ -20,9 +20,9 @@ def list_to_string(l):
 
 # Input parameters
 
-var='tasmax'
+var='pr'
 freq='day'
-obsname = 'EWEMBI-UK25'
+obsname = 'EWEMBI'
 daterange_calibrate = '1979-2013' # Default (extent of EWEMBI dataset)
 expt='All-Hist'
 
@@ -35,10 +35,26 @@ expt='All-Hist'
 #model='MIROC5'
 #realization_calibrate = 'run101'
 
-model = 'HadAM3P-EU25'
-realization_calibrate = 'runcat1'
-#daterange_calibrate = '1987-2013' # Override for HadAM3P
-daterange_calibrate = '1986-2013' # Override for HadAM3P
+#model='ECHAM6-3-LR'
+# NOTE this is for v1-1 (bias correction runs) v1-0 is 2006-2015 decade
+#realization_calibrate = 'run001' 
+
+model = 'CanAM4'
+# NOTE: the bias correction runs (est2) actually points to amip runs from CMIP5
+# as there aren't any bias correction runs specifically for HAPPI
+realization_calibrate = 'r1i1p1'
+# Override default range for years available:
+daterange_calibrate = '1979-2009' 
+
+#model = 'HadAM3P'
+#realization_calibrate = 'runcat1'
+# Override default date range for years available
+#daterange_calibrate = '1987-2013' # for HadAM3P 10 year runs
+
+#model = 'HadAM3P-EU25'
+#realization_calibrate = 'runcat1'
+# Override default date range for years available
+#daterange_calibrate = '1986-2013' # for HadAM3P, EU25 runs
 
 
 ###############################################################################
@@ -58,7 +74,7 @@ os.environ['odirGCMdata']=odirGCMdata
 
 # Original location of the happi data
 #datadir = os.path.join(wdir,'../happi_data/')
-datadir = os.path.join(wdir,'../happi_data_extra/')
+datadir = os.path.join(wdir,'../happi_data/')
 logdir = os.path.join(wdir,'logs/')
 
 # Not used in this script but needed for ISIMIP scripts:
@@ -218,6 +234,22 @@ for runpath in f_runs:
 	if os.path.basename(runpath)==realization_calibrate:
 		calc_bias_correction_coef(model,expt,var,freq,daterange_calibrate,idirGCMsource,idirGCMdata,runpath)
 
+##########################################################################################
+
+# Finally do a bit of cleaning up
+
+idat_dir = os.path.join(tdir,model,obsname,'idat')
+odat_dir = os.path.join(tdir,model,obsname,'odat')
+
+if os.path.exists(idat_dir):
+	print('deleting idat dir',idat_dir)
+	shutil.rmtree(idat_dir)
+else:
+	print('trying to delete but idat dir doesnt exist',idat_dir)
 	
 
-
+if os.path.exists(odat_dir):
+	print('deleting odat dir',odat_dir)
+	shutil.rmtree(odat_dir)
+else:
+	print('trying to delete but odat dir doesnt exist',odat_dir)
